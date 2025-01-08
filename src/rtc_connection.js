@@ -1,6 +1,7 @@
 // IO handling ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 import { initializeApp } from "firebase/app";
 import { getFirestore, collection, doc, setDoc, getDoc, addDoc, updateDoc, onSnapshot, } from "firebase/firestore";
+import {run_game} from "./game.js"
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
@@ -27,18 +28,23 @@ const servers = {
 
 const pc = new RTCPeerConnection(servers);
 var pc_channel = null; 
+var player_ind = null; 
 
 // HTML elements
 const callButton = document.getElementById('callButton');
 const callInput = document.getElementById('callInput');
 const answerButton = document.getElementById('answerButton');
 const hangupButton = document.getElementById('hangupButton');
+const startGameButton = document.getElementById('startGameButton');
+
 
 // 2. Create an offer
 callButton.onclick = async () => {
     pc_channel = pc.createDataChannel("sendChannel");
     pc_channel.onopen = function () {
-        pc_channel.send("Hello World!");
+        // startGameButton.disabled = false; 
+        player_ind = 0; 
+        run_game(player_ind, pc_channel); 
     };
     pc_channel.onclose = function () {console.log('pc_channel closed');};
     pc_channel.onmessage = function (event) {console.log("Got Data Channel Message:", event.data);};
@@ -85,7 +91,6 @@ callButton.onclick = async () => {
       });
     }); 
     answerButton.disabled = true; 
-    hangupButton.disabled = false;
   };
 
 
@@ -107,6 +112,10 @@ function receiveChannelCallback(event) {
     pc_channel.onmessage = handleReceiveMessage;
     pc_channel.onopen = handleReceiveChannelStatusChange;
     pc_channel.onclose = handleReceiveChannelStatusChange;
+    startGameButton.disabled = false; 
+    player_ind = 1; 
+    run_game(player_ind, pc_channel); 
+
 }
 
 // 3. Answer the call with the unique ID
@@ -142,7 +151,7 @@ answerButton.onclick = async () => {
   
     onSnapshot(offerCandidates, (snapshot) => {
       snapshot.docChanges().forEach((change) => {
-        console.log(change);
+        // console.log(change);
         if (change.type === 'added') {
           const data = change.doc.data();
           pc.addIceCandidate(new RTCIceCandidate(data));

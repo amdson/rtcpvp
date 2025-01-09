@@ -1,5 +1,5 @@
 import {Vector2, Box2} from "threejs-math"
-import {build_player, build_player_inp, update, array_equal, input_equal} from "./game_state.js"
+import {build_player, build_player_inp, evil_AI, update, array_equal, input_equal} from "./game_state.js"
 // import { pc_channel, player_ind } from "./rtc_connection.js";
 
 
@@ -24,6 +24,9 @@ function handledown(e) {
     } else {
         key_dict[e.code] = true; 
     }
+    if(e.code == "Space") {
+        e.preventDefault(); 
+    }
     [space_d, shift_d] = [key_dict['Space'], key_dict['LeftShift']]; 
     x_dir = rd - ld; y_dir = dd - ud; 
 }
@@ -47,12 +50,12 @@ function handleup(e) {
 const canvas = document.getElementById("canvas");
 canvas.oncontextmenu = function(e) { e.preventDefault(); e.stopPropagation(); }
 const ctx = canvas.getContext("2d");
-const rect = canvas.getBoundingClientRect();
 
 var mouse_x = 0; var mouse_y = 0; 
 var mouse_left = false; var mouse_right = false; 
 
 canvas.addEventListener('mousemove', (event) => {
+  let rect = canvas.getBoundingClientRect();
   mouse_x = event.clientX - rect.left;
   mouse_y = event.clientY - rect.top;
 });
@@ -165,7 +168,9 @@ function run_game(player_ind, datachannel) {
     let previous_time = 0.0;
     let delta = 0.0;
 
-    datachannel.onmessage = recieve_input; 
+    if(datachannel != null) {
+        datachannel.onmessage = recieve_input; 
+    }
 
     const loop = time => {
         const dt = time - previous_time;
@@ -217,13 +222,16 @@ function run_game(player_ind, datachannel) {
             gamestate_buffer[buffer_start] = gamestate; 
             let curr_local_input = build_player_inp(x_dir, y_dir, mouse_x, mouse_y, mouse_left, mouse_right, (space_d || shift_d)); 
             local_input_buffer[buffer_start] = [gamestate.frame, curr_local_input]; 
-            
-            //Send local input across datachannel
-            let curr_input_data = JSON.stringify([gamestate.frame, curr_local_input]); 
-            datachannel.send(curr_input_data); 
 
+            if(datachannel == null) {
+                let curr_ai_input = evil_AI(gamestate); 
+                remote_input_buffer[buffer_start] = [gamestate.frame, curr_ai_input, false]; 
+            } else {
+                //Send local input across datachannel
+                let curr_input_data = JSON.stringify([gamestate.frame, curr_local_input]); 
+                datachannel.send(curr_input_data); 
+            }
             buffer_start = (buffer_start + 1) % buffer_len; //Update place in buffer
-
         }
 
         if(key_dict['KeyJ']) {
@@ -245,6 +253,7 @@ function run_game(player_ind, datachannel) {
     });
 }
 
-// const startGameButton = document.getElementById('startGameButton');
-// startGameButton.onclick = (() => run_game(player_ind, pc_channel)); 
+const startGameButton = document.getElementById('startGameButton');
+startGameButton.onclick = (() => run_game(0, null)); 
+
 export {run_game}; 
